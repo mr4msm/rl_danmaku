@@ -25,15 +25,17 @@ class BaseModel(Chain):
             self.conv3 = L.Convolution2D(32, 64, 4,
                                          stride=2, pad=1,
                                          initialW=initializer)
-            self.fc4 = L.Linear(None, 256, initialW=initializer)
-            self.fc5 = L.Linear(256, n_actions, initialW=initializer)
+            self.conv4 = L.Convolution2D(64, 128, 4,
+                                         stride=2, pad=1,
+                                         initialW=initializer)
+            self.fc5 = L.Linear(None, n_actions, initialW=initializer)
 
     def __call__(self, x):
         y = F.relu(self.conv0(x))
         y = F.relu(self.conv1(y))
         y = F.relu(self.conv2(y))
         y = F.relu(self.conv3(y))
-        y = F.relu(self.fc4(y))
+        y = F.relu(self.conv4(y))
         y = self.fc5(y)
 
         return y
