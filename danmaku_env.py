@@ -6,7 +6,6 @@ from gym import spaces
 from pygame import _numpysurfarray as npsurfarray
 
 FPS = 30
-BULLET_GEN_INTERVAL = 10
 
 WINDOW_WIDTH = 400
 WINDOW_HEIGHT = 600
@@ -20,7 +19,7 @@ MAX_N_BULLETS = 1000
 # RGB
 COLORS = {
     'back': (0, 0, 0),
-    'out': (32, 32, 32),
+    'out': (128, 128, 128),
     'message': (255, 255, 255),
     'player': (255, 255, 255),
     'enemy': (255, 255, 0),
@@ -96,6 +95,7 @@ class Enemy(StgObj):
                    color)
             for add_angle in range(n_lines)
         ]
+
         if self.bullet_clock_wise:
             self.bullet_g_angle -= 2 * np.pi / (FPS * 2)
             if self.bullet_g_angle < 0:
@@ -107,32 +107,35 @@ class Enemy(StgObj):
 
         return bullets
 
-    def generate_bullets_r(self, radius=8, speed=6, color=COLORS['bullet_r']):
+    def generate_bullets_r(self, radius=8, speed=6,
+                           color=COLORS['bullet_r'], hard=False):
         bullets = [
             Bullet(self.pos, radius,
-                   (speed * sin_table(self.bullet_r_angle),
-                    -speed * cos_table(self.bullet_r_angle)), color),
-            Bullet(self.pos, radius,
-                   (speed * sin_table(np.pi / 2 - self.bullet_r_angle),
-                    -speed * cos_table(np.pi / 2 - self.bullet_r_angle)),
+                   (speed * cos_table(self.bullet_g_angle),
+                    -speed * sin_table(self.bullet_g_angle)),
                    color),
             Bullet(self.pos, radius,
-                   (speed * sin_table(np.pi / 4 - self.bullet_r_angle),
-                    -speed * cos_table(np.pi / 4 - self.bullet_r_angle)),
+                   (speed * cos_table(self.bullet_g_angle),
+                    speed * sin_table(self.bullet_g_angle)),
                    color),
             Bullet(self.pos, radius,
-                   (speed * sin_table(3 * np.pi / 4 - self.bullet_r_angle),
-                    -speed * cos_table(3 * np.pi / 4 - self.bullet_r_angle)),
+                   (speed * cos_table(self.bullet_g_angle + np.pi),
+                    -speed * sin_table(self.bullet_g_angle + np.pi)),
+                   color),
+            Bullet(self.pos, radius,
+                   (speed * cos_table(self.bullet_g_angle + np.pi),
+                    speed * sin_table(self.bullet_g_angle + np.pi)),
                    color),
         ]
+
         if self.bullet_clock_wise:
-            self.bullet_r_angle -= 2 * np.pi / (FPS * 2)
-            if self.bullet_r_angle < 0:
-                self.bullet_r_angle += 2 * np.pi
+            self.bullet_g_angle -= 2 * np.pi / (FPS * 2)
+            if self.bullet_g_angle < 0:
+                self.bullet_g_angle += 2 * np.pi
         else:
-            self.bullet_r_angle += 2 * np.pi / (FPS * 2)
-            if self.bullet_r_angle >= 2 * np.pi:
-                self.bullet_r_angle -= 2 * np.pi
+            self.bullet_g_angle += 2 * np.pi / (FPS * 2)
+            if self.bullet_g_angle >= 2 * np.pi:
+                self.bullet_g_angle -= 2 * np.pi
 
         return bullets
 
@@ -156,7 +159,7 @@ class Player(StgObj):
 
 
 class DanmakuEnv(object):
-    def __init__(self, random_seed=None):
+    def __init__(self, hard=False, random_seed=None):
         super(DanmakuEnv, self).__init__()
         pygame.init()
         self.surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -167,6 +170,17 @@ class DanmakuEnv(object):
             dtype='float32')
         self.action_space = spaces.Discrete(9)
         self.random_state = np.random.RandomState(seed=random_seed)
+
+        if hard:
+            self.hard = True
+            self.bullet_gen_interval = 10
+            self.bullet_speed = 6
+            self.bullet_g_lines = 10
+        else:
+            self.hard = False
+            self.bullet_gen_interval = 10
+            self.bullet_speed = 6
+            self.bullet_g_lines = 5
 
     def reset(self):
         self.player = Player((WINDOW_WIDTH / 2, 3 * WINDOW_HEIGHT / 4))
@@ -241,9 +255,13 @@ class DanmakuEnv(object):
         for enemy in self.enemies:
             enemy.step()
             enemy.draw(self.surface)
-            if self.t % BULLET_GEN_INTERVAL == 0:
-                self.bullets += enemy.generate_bullets_g()
-                self.bullets += enemy.generate_bullets_r()
+            if self.t % self.bullet_gen_interval == 0:
+                self.bullets += enemy.generate_bullets_g(
+                    speed=self.bullet_speed, n_lines=self.bullet_g_lines
+                )
+                self.bullets += enemy.generate_bullets_r(
+                    speed=self.bullet_speed, hard=self.hard,
+                )
 
         if len(self.bullets) > MAX_N_BULLETS:
             self.bullets = self.bullets[-MAX_N_BULLETS:]

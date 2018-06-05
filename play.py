@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import argparse
 import pygame
 from pygame.locals import QUIT, KEYDOWN
 from pygame.locals import K_LEFT, K_RIGHT, K_UP, K_DOWN
@@ -27,13 +28,18 @@ KEY_TO_ACTION = {
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--hard', action='store_true',
+                        help='switch to hard mode.')
+    args = parser.parse_args()
+
     pygame.init()
     surface = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     pygame.display.set_caption('danmaku')
     fps_clock = pygame.time.Clock()
     sys_font = pygame.font.SysFont(None, 36)
 
-    env = DanmakuEnv()
+    env = DanmakuEnv(hard=args.hard)
     env.reset()
 
     score = 0

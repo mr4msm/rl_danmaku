@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+import argparse
 import numpy as np
 import os
 from chainerrl.agents.a3c import A3C
 from chainerrl.optimizers import RMSpropAsync
+from chainerrl.optimizers.nonbias_weight_decay import NonbiasWeightDecay
 from chainer.optimizer import GradientClipping
 from datetime import datetime as dt
 
@@ -26,12 +28,17 @@ def train_one_step(idx, env, agent, state, reward):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--hard', action='store_true',
+                        help='switch to hard mode.')
+    args = parser.parse_args()
+
     out_dir = 'results_' + dt.now().strftime('%Y%m%d%H%M%S')
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     assert os.path.isdir(out_dir)
 
-    envs = [DanmakuEnv(random_seed=rs) for rs
+    envs = [DanmakuEnv(hard=args.hard, random_seed=rs) for rs
             in np.random.randint(np.iinfo(np.uint32).max, size=N_PROCESSES)]
     obs_space = envs[0].observation_space
     action_space = envs[0].action_space
@@ -43,8 +50,9 @@ def main():
     opt = RMSpropAsync(lr=7e-4, eps=1e-1, alpha=0.99)
     opt.setup(model)
     opt.add_hook(GradientClipping(40))
+    opt.add_hook(NonbiasWeightDecay(1e-4))
 
-    agents = [A3C(model, opt, t_max=5, gamma=0.99,
+    agents = [A3C(model, opt, t_max=10, gamma=0.99,
                   beta=1e-2, process_idx=idx)
               for idx in range(N_PROCESSES)]
 
@@ -77,6 +85,7 @@ def main():
                 dt.now().strftime('%Y%m%d%H%M%S'))
             agents[0].save(save_agent_path)
             print('save ' + save_agent_path)
+
         step_count += 1
 
 
