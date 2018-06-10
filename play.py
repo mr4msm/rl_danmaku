@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 import argparse
 import pygame
+import sys
 from pygame.locals import QUIT, KEYDOWN
 from pygame.locals import K_LEFT, K_RIGHT, K_UP, K_DOWN
 from pygame.locals import K_RETURN, K_ESCAPE
 
 from danmaku_env import FPS, WINDOW_WIDTH, WINDOW_HEIGHT, DanmakuEnv
+from misc import argv2line, print_args
 
 KEY_TO_ACTION = {
     0: 0,
@@ -29,9 +31,17 @@ KEY_TO_ACTION = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--hard', action='store_true',
-                        help='switch to hard mode.')
+    parser.add_argument('-e', '--enemy_step_width', default=1, type=int)
+    parser.add_argument('-l', '--level', default=0, type=int,
+                        help='difficulty')
+    parser.add_argument('-p', '--player_step_width', default=4, type=int)
+    parser.add_argument('-r', '--random_seed', default=None, type=int)
     args = parser.parse_args()
+
+    print(argv2line(sys.argv))
+    print()
+    print_args(args)
+    print()
 
     pygame.init()
     surface = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -39,7 +49,9 @@ def main():
     fps_clock = pygame.time.Clock()
     sys_font = pygame.font.SysFont(None, 36)
 
-    env = DanmakuEnv(hard=args.hard)
+    env = DanmakuEnv(level=args.level, random_seed=args.random_seed,
+                     player_step_width=args.player_step_width,
+                     enemy_step_width=args.enemy_step_width)
     env.reset()
 
     score = 0

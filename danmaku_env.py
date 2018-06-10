@@ -108,7 +108,7 @@ class Enemy(StgObj):
         return bullets
 
     def generate_bullets_r(self, radius=8, speed=6,
-                           color=COLORS['bullet_r'], hard=False):
+                           color=COLORS['bullet_r']):
         bullets = [
             Bullet(self.pos, radius,
                    (speed * cos_table(self.bullet_g_angle),
@@ -159,7 +159,8 @@ class Player(StgObj):
 
 
 class DanmakuEnv(object):
-    def __init__(self, hard=False, random_seed=None):
+    def __init__(self, level=0, random_seed=None,
+                 player_step_width=4, enemy_step_width=1):
         super(DanmakuEnv, self).__init__()
         pygame.init()
         self.surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -171,16 +172,21 @@ class DanmakuEnv(object):
         self.action_space = spaces.Discrete(9)
         self.random_state = np.random.RandomState(seed=random_seed)
 
-        if hard:
-            self.hard = True
-            self.bullet_gen_interval = 10
-            self.bullet_speed = 6
+        self.player_step_width = player_step_width
+        self.enemy_step_width = enemy_step_width
+
+        sup_level = 3
+        self.level = level % sup_level
+        print('game level {} ({} mod {})'.format(self.level, level, sup_level))
+
+        self.bullet_gen_interval = 10
+        self.bullet_speed = 6
+        self.bullet_g_lines = 5
+
+        if self.level >= 1:
             self.bullet_g_lines = 10
-        else:
-            self.hard = False
-            self.bullet_gen_interval = 10
-            self.bullet_speed = 6
-            self.bullet_g_lines = 5
+        if self.level >= 2:
+            self.bullet_gen_interval = 6
 
     def reset(self):
         self.player = Player((WINDOW_WIDTH / 2, 3 * WINDOW_HEIGHT / 4))
@@ -235,7 +241,7 @@ class DanmakuEnv(object):
     def step(self, action):
         self.surface.fill(COLORS['back'])
 
-        self.player.step(action, width=4)
+        self.player.step(action, width=self.player_step_width)
         self.player.draw(self.surface)
 
         # left, top, right, bottom
@@ -253,14 +259,14 @@ class DanmakuEnv(object):
         player_region = (vicinity == COLORS['player']).all(axis=2)
 
         for enemy in self.enemies:
-            enemy.step()
+            enemy.step(width=self.enemy_step_width)
             enemy.draw(self.surface)
             if self.t % self.bullet_gen_interval == 0:
                 self.bullets += enemy.generate_bullets_g(
                     speed=self.bullet_speed, n_lines=self.bullet_g_lines
                 )
                 self.bullets += enemy.generate_bullets_r(
-                    speed=self.bullet_speed, hard=self.hard,
+                    speed=self.bullet_speed
                 )
 
         if len(self.bullets) > MAX_N_BULLETS:
