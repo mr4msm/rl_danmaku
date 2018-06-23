@@ -28,23 +28,22 @@ COLORS = {
 }
 
 SIN_RES = 360
-SIN_UNIT = 2. * np.pi / SIN_RES
-SIN_TABLE = np.sin(2. * np.pi * np.arange(SIN_RES, dtype='float') / SIN_RES)
-COS_TABLE = np.cos(2. * np.pi * np.arange(SIN_RES, dtype='float') / SIN_RES)
+SIN_TABLE = np.sin(2 * np.pi * np.arange(SIN_RES, dtype=float) / SIN_RES)
+COS_TABLE = np.cos(2 * np.pi * np.arange(SIN_RES, dtype=float) / SIN_RES)
 
 
 def sin_table(x):
-    return SIN_TABLE[int(x // SIN_UNIT) % SIN_RES]
+    return SIN_TABLE[int(x * SIN_RES / (2 * np.pi)) % SIN_RES]
 
 
 def cos_table(x):
-    return COS_TABLE[int(x // SIN_UNIT) % SIN_RES]
+    return COS_TABLE[int(x * SIN_RES / (2 * np.pi)) % SIN_RES]
 
 
 class StgObj(object):
     def __init__(self, pos, radius, color):
         super(StgObj, self).__init__()
-        self.pos = np.asarray(pos, dtype=np.float).copy()
+        self.pos = np.asarray(pos, dtype=float).copy()
         self.radius = radius
         self.color = color
 
@@ -61,7 +60,7 @@ class StgObj(object):
 class Bullet(StgObj):
     def __init__(self, pos, radius=8, velocity=(0, 0), color=COLORS['enemy']):
         super(Bullet, self).__init__(pos, radius, color)
-        self.velocity = np.asarray(velocity, dtype=np.float).copy()
+        self.velocity = np.asarray(velocity, dtype=float).copy()
 
     def step(self):
         self.pos += self.velocity
@@ -73,16 +72,35 @@ class Enemy(StgObj):
         super(Enemy, self).__init__(pos, radius, color)
         self.bullet_clock_wise = bullet_clock_wise
 
+        if bullet_clock_wise:
+            self.clock_sign = -1
+        else:
+            self.clock_sign = 1
+
         self.random_state = np.random.RandomState(seed=random_seed)
         self.bullet_g_angle = 2 * np.pi * self.random_state.random_sample()
         self.bullet_r_angle = 2 * np.pi * self.random_state.random_sample()
 
     def step(self, width=1):
-        self.pos[0] += width * (self.random_state.randint(0, 3) - 1)
-        self.pos[1] += width * (self.random_state.randint(0, 3) - 1)
+        action = self.random_state.randint(9)
+        if action > 0:
+            self.pos[0] += width * cos_table(action * 2 * np.pi / 8)
+            self.pos[1] += width * sin_table(action * 2 * np.pi / 8)
 
         self.pos[0] = min(max(0, self.pos[0]), WINDOW_WIDTH - 1)
         self.pos[1] = min(max(0, self.pos[1]), WINDOW_HEIGHT / 2)
+
+        self.bullet_g_angle += self.clock_sign * 2 * np.pi / (FPS * 15)
+        if self.bullet_g_angle < 0:
+            self.bullet_g_angle += 2 * np.pi
+        elif self.bullet_g_angle >= 2 * np.pi:
+            self.bullet_g_angle -= 2 * np.pi
+
+        self.bullet_r_angle += self.clock_sign * 2 * np.pi / (FPS * 10)
+        if self.bullet_r_angle < 0:
+            self.bullet_r_angle += 2 * np.pi
+        elif self.bullet_r_angle >= 2 * np.pi:
+            self.bullet_r_angle -= 2 * np.pi
 
     def generate_bullets_g(self, radius=8, speed=6, n_lines=5,
                            color=COLORS['bullet_g']):
@@ -96,46 +114,28 @@ class Enemy(StgObj):
             for add_angle in range(n_lines)
         ]
 
-        if self.bullet_clock_wise:
-            self.bullet_g_angle -= 2 * np.pi / (FPS * 2)
-            if self.bullet_g_angle < 0:
-                self.bullet_g_angle += 2 * np.pi
-        else:
-            self.bullet_g_angle += 2 * np.pi / (FPS * 2)
-            if self.bullet_g_angle >= 2 * np.pi:
-                self.bullet_g_angle -= 2 * np.pi
-
         return bullets
 
     def generate_bullets_r(self, radius=8, speed=6,
                            color=COLORS['bullet_r']):
         bullets = [
             Bullet(self.pos, radius,
-                   (speed * cos_table(self.bullet_g_angle),
-                    -speed * sin_table(self.bullet_g_angle)),
+                   (speed * cos_table(self.bullet_r_angle),
+                    -speed * sin_table(self.bullet_r_angle)),
                    color),
             Bullet(self.pos, radius,
-                   (speed * cos_table(self.bullet_g_angle),
-                    speed * sin_table(self.bullet_g_angle)),
+                   (speed * cos_table(self.bullet_r_angle),
+                    speed * sin_table(self.bullet_r_angle)),
                    color),
             Bullet(self.pos, radius,
-                   (speed * cos_table(self.bullet_g_angle + np.pi),
-                    -speed * sin_table(self.bullet_g_angle + np.pi)),
+                   (speed * cos_table(self.bullet_r_angle + np.pi),
+                    -speed * sin_table(self.bullet_r_angle + np.pi)),
                    color),
             Bullet(self.pos, radius,
-                   (speed * cos_table(self.bullet_g_angle + np.pi),
-                    speed * sin_table(self.bullet_g_angle + np.pi)),
+                   (speed * cos_table(self.bullet_r_angle + np.pi),
+                    speed * sin_table(self.bullet_r_angle + np.pi)),
                    color),
         ]
-
-        if self.bullet_clock_wise:
-            self.bullet_g_angle -= 2 * np.pi / (FPS * 2)
-            if self.bullet_g_angle < 0:
-                self.bullet_g_angle += 2 * np.pi
-        else:
-            self.bullet_g_angle += 2 * np.pi / (FPS * 2)
-            if self.bullet_g_angle >= 2 * np.pi:
-                self.bullet_g_angle -= 2 * np.pi
 
         return bullets
 
@@ -145,14 +145,10 @@ class Player(StgObj):
         super(Player, self).__init__(pos, radius, color)
 
     def step(self, action, width=1):
-        if action == 6 or action == 7 or action == 8:
-            self.pos[0] -= width
-        if action == 2 or action == 3 or action == 4:
-            self.pos[0] += width
-        if action == 1 or action == 2 or action == 8:
-            self.pos[1] -= width
-        if action == 4 or action == 5 or action == 6:
-            self.pos[1] += width
+        if action > 0:
+            action -= 3
+            self.pos[0] += width * cos_table(action * 2 * np.pi / 8)
+            self.pos[1] += width * sin_table(action * 2 * np.pi / 8)
 
         self.pos[0] = min(max(0, self.pos[0]), WINDOW_WIDTH - 1)
         self.pos[1] = min(max(0, self.pos[1]), WINDOW_HEIGHT - 1)
@@ -168,7 +164,7 @@ class DanmakuEnv(object):
         self.surface_image = npsurfarray.array3d(self.surface)
         self.observation_space = spaces.Box(
             -1., 1., (STATE_N_FRAMES, STATE_HEIGHT, STATE_WIDTH),
-            dtype='float32')
+            dtype=np.float32)
         self.action_space = spaces.Discrete(9)
         self.random_state = np.random.RandomState(seed=random_seed)
 
@@ -211,7 +207,7 @@ class DanmakuEnv(object):
 
         gray_surface = cv2.cvtColor(self.surface_image, cv2.COLOR_RGB2GRAY)
         st_frame = np.full((STATE_WIDTH, STATE_HEIGHT),
-                           fill_value=COLORS['out'][0], dtype='uint8')
+                           fill_value=COLORS['out'][0], dtype=np.uint8)
 
         pt_x_int = int(self.player.pos[0] + 0.5)
         pt_y_int = int(self.player.pos[1] + 0.5)
@@ -285,7 +281,7 @@ class DanmakuEnv(object):
 
         gray_surface = cv2.cvtColor(self.surface_image, cv2.COLOR_RGB2GRAY)
         st_frame = np.full((STATE_WIDTH, STATE_HEIGHT),
-                           fill_value=COLORS['out'][0], dtype='uint8')
+                           fill_value=COLORS['out'][0], dtype=np.uint8)
 
         pt_x_int = int(self.player.pos[0] + 0.5)
         pt_y_int = int(self.player.pos[1] + 0.5)
