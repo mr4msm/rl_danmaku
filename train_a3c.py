@@ -14,8 +14,8 @@ from misc import argv2line, print_args
 from model import Model
 
 N_PROCESSES = 4
-N_STEPS = 600000
-SAVE_INTERVAL = 20000
+N_STEPS = 1000000
+SAVE_INTERVAL = 50000
 
 
 def train_one_step(idx, env, agent, state, reward):
@@ -31,7 +31,7 @@ def train_one_step(idx, env, agent, state, reward):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-e', '--enemy_step_width', default=1, type=int)
+    parser.add_argument('-e', '--enemy_step_width', default=2, type=int)
     parser.add_argument('-l', '--level', default=0, type=int,
                         help='difficulty')
     parser.add_argument('-o', '--out_dir', default=None)
@@ -85,23 +85,23 @@ def main():
         states = [result[1] for result in results]
         rewards = [result[2] for result in results]
 
+        step_count += 1
+
         print(dt.now())
-        print('passed steps: {0:06d}'.format(step_count + 1))
+        print('passed steps: {0:07d}'.format(step_count))
         print('statistics: {}'.format(agents[0].get_statistics()))
 
         if envs[0].t == 0:
             episode_count += 1
             print('episode: {0:06d}'.format(episode_count + 1))
 
-        if (step_count + 1) % SAVE_INTERVAL == 0:
+        if (step_count) % SAVE_INTERVAL == 0:
             save_agent_path = os.path.join(
                 out_dir,
-                'agent_step_{0:06d}_'.format(step_count + 1) +
+                'agent_step_{0:07d}_'.format(step_count) +
                 dt.now().strftime('%Y%m%d%H%M%S'))
             agents[0].save(save_agent_path)
             print('save ' + save_agent_path)
-
-        step_count += 1
 
 
 if __name__ == '__main__':

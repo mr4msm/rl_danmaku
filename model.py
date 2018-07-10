@@ -13,30 +13,26 @@ class BaseModel(Chain):
         initializer = initializers.HeNormal()
 
         with self.init_scope():
-            self.conv0 = L.Convolution2D(in_channels, 8, 4,
+            self.conv0 = L.Convolution2D(in_channels, 16, 4,
+                                         stride=4, pad=0,
+                                         initialW=initializer)
+            self.conv1 = L.Convolution2D(16, 32, 4,
                                          stride=2, pad=1,
                                          initialW=initializer)
-            self.conv1 = L.Convolution2D(8, 16, 4,
+            self.conv2 = L.Convolution2D(32, 64, 4,
                                          stride=2, pad=1,
                                          initialW=initializer)
-            self.conv2 = L.Convolution2D(16, 32, 4,
+            self.conv3 = L.Convolution2D(64, 128, 4,
                                          stride=2, pad=1,
                                          initialW=initializer)
-            self.conv3 = L.Convolution2D(32, 64, 4,
-                                         stride=2, pad=1,
-                                         initialW=initializer)
-            self.conv4 = L.Convolution2D(64, 128, 4,
-                                         stride=2, pad=1,
-                                         initialW=initializer)
-            self.fc5 = L.Linear(None, n_actions, initialW=initializer)
+            self.fc4 = L.Linear(None, n_actions, initialW=initializer)
 
     def __call__(self, x):
         y = F.relu(self.conv0(x))
         y = F.relu(self.conv1(y))
         y = F.relu(self.conv2(y))
         y = F.relu(self.conv3(y))
-        y = F.relu(self.conv4(y))
-        y = self.fc5(y)
+        y = self.fc4(y)
 
         return y
 

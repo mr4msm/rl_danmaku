@@ -31,7 +31,7 @@ KEY_TO_ACTION = {
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-e', '--enemy_step_width', default=1, type=int)
+    parser.add_argument('-e', '--enemy_step_width', default=2, type=int)
     parser.add_argument('-l', '--level', default=0, type=int,
                         help='difficulty')
     parser.add_argument('-p', '--player_step_width', default=4, type=int)
@@ -119,8 +119,8 @@ def main():
                 'Enter to restart, Esc to exit.',
                 True, (255, 255, 255)
             )
-            mes_menu_rect = mes_high_score.get_rect()
-            mes_menu_rect.center = (150, 550)
+            mes_menu_rect = mes_menu.get_rect()
+            mes_menu_rect.center = (200, 550)
 
             surface.blit(mes_score, mes_score_rect)
             surface.blit(mes_high_score, mes_high_score_rect)

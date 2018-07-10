@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import pygame
 from gym import spaces
-from pygame import _numpysurfarray as npsurfarray
+from pygame import surfarray
 
 FPS = 30
 
@@ -68,7 +68,8 @@ class Bullet(StgObj):
 
 class Enemy(StgObj):
     def __init__(self, pos, radius=4, color=COLORS['enemy'],
-                 bullet_clock_wise=False, random_seed=None):
+                 bullet_clock_wise=False, random_seed=None,
+                 g_cycle=15, r_cycle=10):
         super(Enemy, self).__init__(pos, radius, color)
         self.bullet_clock_wise = bullet_clock_wise
 
@@ -76,6 +77,9 @@ class Enemy(StgObj):
             self.clock_sign = -1
         else:
             self.clock_sign = 1
+
+        self.g_cycle = g_cycle
+        self.r_cycle = r_cycle
 
         self.random_state = np.random.RandomState(seed=random_seed)
         self.bullet_g_angle = 2 * np.pi * self.random_state.random_sample()
@@ -90,13 +94,17 @@ class Enemy(StgObj):
         self.pos[0] = min(max(0, self.pos[0]), WINDOW_WIDTH - 1)
         self.pos[1] = min(max(0, self.pos[1]), WINDOW_HEIGHT / 2)
 
-        self.bullet_g_angle += self.clock_sign * 2 * np.pi / (FPS * 15)
+        self.bullet_g_angle += self.clock_sign * \
+            2 * np.pi / (FPS * self.g_cycle)
+
         if self.bullet_g_angle < 0:
             self.bullet_g_angle += 2 * np.pi
         elif self.bullet_g_angle >= 2 * np.pi:
             self.bullet_g_angle -= 2 * np.pi
 
-        self.bullet_r_angle += self.clock_sign * 2 * np.pi / (FPS * 10)
+        self.bullet_r_angle += self.clock_sign * \
+            2 * np.pi / (FPS * self.r_cycle)
+
         if self.bullet_r_angle < 0:
             self.bullet_r_angle += 2 * np.pi
         elif self.bullet_r_angle >= 2 * np.pi:
@@ -156,12 +164,12 @@ class Player(StgObj):
 
 class DanmakuEnv(object):
     def __init__(self, level=0, random_seed=None,
-                 player_step_width=4, enemy_step_width=1):
+                 player_step_width=4, enemy_step_width=2):
         super(DanmakuEnv, self).__init__()
         pygame.init()
         self.surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
         self.surface.fill(COLORS['back'])
-        self.surface_image = npsurfarray.array3d(self.surface)
+        self.surface_image = surfarray.array3d(self.surface)
         self.observation_space = spaces.Box(
             -1., 1., (STATE_N_FRAMES, STATE_HEIGHT, STATE_WIDTH),
             dtype=np.float32)
@@ -171,29 +179,47 @@ class DanmakuEnv(object):
         self.player_step_width = player_step_width
         self.enemy_step_width = enemy_step_width
 
-        sup_level = 3
+        sup_level = 4
         self.level = level % sup_level
         print('game level {} ({} mod {})'.format(self.level, level, sup_level))
 
         self.bullet_gen_interval = 10
         self.bullet_speed = 6
         self.bullet_g_lines = 5
+        self.g_radius = 8
+        self.r_radius = 8
+        self.g_cycle = 15
+        self.r_cycle = 10
 
         if self.level >= 1:
             self.bullet_g_lines = 10
         if self.level >= 2:
             self.bullet_gen_interval = 6
+        # level 3 is easier than level 2 ?
+        if self.level >= 3:
+            self.bullet_g_lines = 5
+            self.bullet_gen_interval = 5
+            self.g_radius = 12
+            self.r_radius = 10
+            self.g_cycle = 3
+            self.r_cycle = 5
 
     def reset(self):
         self.player = Player((WINDOW_WIDTH / 2, 3 * WINDOW_HEIGHT / 4))
         self.enemies = [
             Enemy((WINDOW_WIDTH / 3, WINDOW_HEIGHT / 3),
                   random_seed=self.random_state.randint(
-                      np.iinfo(np.uint32).max)
+                      np.iinfo(np.uint32).max),
+                  g_cycle=self.g_cycle,
+                  r_cycle=self.r_cycle,
                   ),
             Enemy((2 * WINDOW_WIDTH / 3, WINDOW_HEIGHT / 3),
                   random_seed=self.random_state.randint(
-                      np.iinfo(np.uint32).max))]
+                      np.iinfo(np.uint32).max),
+                  g_cycle=self.g_cycle,
+                  r_cycle=self.r_cycle,
+                  ),
+        ]
         self.bullets = []
 
         self.surface.fill(COLORS['back'])
@@ -203,7 +229,7 @@ class DanmakuEnv(object):
         for bullet in self.bullets:
             bullet.draw(self.surface)
 
-        self.surface_image = npsurfarray.array3d(self.surface)
+        self.surface_image = surfarray.array3d(self.surface)
 
         gray_surface = cv2.cvtColor(self.surface_image, cv2.COLOR_RGB2GRAY)
         st_frame = np.full((STATE_WIDTH, STATE_HEIGHT),
@@ -250,7 +276,7 @@ class DanmakuEnv(object):
                 WINDOW_HEIGHT)
         )
 
-        vicinity = npsurfarray.array3d(
+        vicinity = surfarray.array3d(
             self.surface)[vic_ltrb[0]:vic_ltrb[2], vic_ltrb[1]:vic_ltrb[3]]
         player_region = (vicinity == COLORS['player']).all(axis=2)
 
@@ -259,10 +285,12 @@ class DanmakuEnv(object):
             enemy.draw(self.surface)
             if self.t % self.bullet_gen_interval == 0:
                 self.bullets += enemy.generate_bullets_g(
-                    speed=self.bullet_speed, n_lines=self.bullet_g_lines
+                    speed=self.bullet_speed, n_lines=self.bullet_g_lines,
+                    radius=self.g_radius,
                 )
                 self.bullets += enemy.generate_bullets_r(
-                    speed=self.bullet_speed
+                    speed=self.bullet_speed,
+                    radius=self.r_radius,
                 )
 
         if len(self.bullets) > MAX_N_BULLETS:
@@ -272,7 +300,7 @@ class DanmakuEnv(object):
             bullet.step()
             bullet.draw(self.surface)
 
-        self.surface_image = npsurfarray.array3d(self.surface)
+        self.surface_image = surfarray.array3d(self.surface)
         vicinity = self.surface_image[
             vic_ltrb[0]:vic_ltrb[2], vic_ltrb[1]:vic_ltrb[3]]
         danger_region = (vicinity == COLORS['enemy']).all(axis=2)
